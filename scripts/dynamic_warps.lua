@@ -71,7 +71,7 @@ local function iterate_uri_query(text)
 end
 
 Net:on("server_message", function(event)
-  local info = server_info_map[event.host]
+  local info = server_info_map[event.address]
 
   if not info then
     info = {
@@ -79,7 +79,7 @@ Net:on("server_message", function(event)
       last_online = 0
     }
 
-    server_info_map[event.host] = info
+    server_info_map[event.address] = info
   end
 
   for key, value in iterate_uri_query(event.data) do
