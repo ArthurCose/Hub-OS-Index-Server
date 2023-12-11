@@ -82,13 +82,17 @@ Net:on("server_message", function(event)
     server_info_map[event.address] = info
   end
 
+  local online_count = 0
+
   for key, value in iterate_uri_query(event.data) do
     if key == "name" or key == "message" or key == "data" then
       info[key] = Net.decode_uri_component(value)
     elseif key == "online" then
-      online_count_map[value] = tonumber(value)
+      online_count = tonumber(value) or 0
     end
   end
+
+  online_count_map[event.address] = online_count
 
   info.last_online = os.time()
 end)
