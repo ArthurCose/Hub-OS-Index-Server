@@ -1,7 +1,6 @@
 SAVE_PATH                    = "_data.json"
 SERVER_EXPIRATION            = 30 * 60 * 60 * 24 -- one month
-EXPECTED_POLL_RATE           = 10 * 60           -- 10 mins
-EXPECTED_POLL_RATE           = 5
+EXPECTED_POLL_RATE           = 5 * 60            -- 5 mins
 
 ACTIVE_SERVER_WARP_NAMES     = {
   "Hot Server",
