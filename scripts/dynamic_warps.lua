@@ -31,7 +31,7 @@ local online_count_map = {}
 --- list of addresses
 local active_servers = {}
 
-Async.read_file(SAVE_PATH, function(data)
+Async.read_file(SAVE_PATH).and_then(function(data)
   if data and #data > 0 then
     server_info_map = JSON.decode(data)
   end
