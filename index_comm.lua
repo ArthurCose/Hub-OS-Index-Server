@@ -1,8 +1,9 @@
 --- Custom Data:
 
-local NAME = ""      -- This server's name (currently unused, but may be used in the future)
-local MESSAGE = ""   -- Dialog for the ampstr
-local WARP_DATA = "" -- What data should the warp from the index contain
+local NAME = ""         -- This server's name (currently unused, but may be used in the future)
+local MESSAGE = ""      -- Dialog for the ampstr
+local WARP_ADDRESS = "" -- What address should the warp link to (port is ignored)
+local WARP_DATA = ""    -- What data should the warp from the index contain
 
 --- Script (do not modify):
 
@@ -11,7 +12,8 @@ local POLL_RATE = 5 * 60
 local MESSAGE_CONSTANT =
     "name=" .. Net.encode_uri_component(NAME) ..
     "&message=" .. Net.encode_uri_component(MESSAGE) ..
-    "&data=" .. WARP_DATA ..
+    "&address=" .. Net.encode_uri_component(WARP_ADDRESS) ..
+    "&data=" .. Net.encode_uri_component(WARP_DATA) ..
     "&online="
 
 local online_count = 0

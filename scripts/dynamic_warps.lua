@@ -3,11 +3,13 @@ math.randomseed()
 
 local Direction = require("scripts/libs/direction")
 local JSON = require("scripts/libs/json")
+local URI = require("scripts/libs/uri")
 local Ampstr = require("scripts/index/ampstr")
 
 -- server and warp data
 
 ---@class ServerInfo
+---@field public_address string|nil
 ---@field name string|nil
 ---@field message string|nil
 ---@field data string|nil
@@ -19,16 +21,16 @@ local default_message <const> = "No server is currently linked here."
 local random_warp_message <const> = "Try your luck! This path links to a random server!"
 
 ---@type table<string, string>
---- warp name -> address
+--- warp name -> host
 local warp_map = {}
 ---@type table<string, ServerInfo>
---- address -> ServerInfo
+--- host -> ServerInfo
 local server_info_map = {}
 ---@type table<string, number>
---- address -> number
+--- host -> number
 local online_count_map = {}
 ---@type string[]
---- list of addresses
+--- list of hosts
 local active_servers = {}
 
 Async.read_file(SAVE_PATH).and_then(function(data)
@@ -46,32 +48,24 @@ local tile_object_data = {
   gid = 0,
 }
 
-local function iterate_uri_query(text)
-  local last_index = 0
-
-  return function()
-    if last_index >= #text then
-      return
-    end
-
-    local eq_index = string.find(text, "=", last_index)
-    local amp_index = string.find(text, "&", eq_index)
-
-    if amp_index == nil then
-      amp_index = #text
-    end
-
-    local key = string.sub(text, last_index, eq_index - 1)
-    local encoded_value = string.sub(text, eq_index + 1, amp_index - 1)
-
-    last_index = amp_index + 1
-
-    return key, encoded_value
-  end
-end
 
 Net:on("server_message", function(event)
-  local info = server_info_map[event.address]
+  local data = URI.parse_query(event.data)
+
+  if not data.address then
+    return
+  end
+
+  local warp_address = Net.decode_uri_component(data.address)
+  local host = URI.get_host(warp_address)
+  local port = URI.get_port(event.address)
+
+  if port ~= 8765 then
+    -- append if the default port is not used
+    host = host .. ":" .. port
+  end
+
+  local info = server_info_map[host]
 
   if not info then
     info = {
@@ -79,20 +73,17 @@ Net:on("server_message", function(event)
       last_online = 0
     }
 
-    server_info_map[event.address] = info
+    server_info_map[host] = info
   end
 
-  local online_count = 0
+  info.public_address = host .. URI.get_data(warp_address)
+  info.name = Net.decode_uri_component(data.name)
+  info.message = Net.decode_uri_component(data.message)
+  info.data = Net.decode_uri_component(data.data)
 
-  for key, value in iterate_uri_query(event.data) do
-    if key == "name" or key == "message" or key == "data" then
-      info[key] = Net.decode_uri_component(value)
-    elseif key == "online" then
-      online_count = tonumber(value) or 0
-    end
+  if data.online then
+    online_count_map[host] = tonumber(data.online) or 0
   end
-
-  online_count_map[event.address] = online_count
 
   info.last_online = os.time()
 end)
@@ -156,14 +147,14 @@ end
 local function update_warps()
   for _, warp_name in ipairs(WARP_NAMES) do
     local warp_id = Net.get_object_by_name(area_id, warp_name).id
-    local address = warp_map[warp_name]
+    local host = warp_map[warp_name]
 
-    if address then
+    if host then
       -- online
-      local info = server_info_map[address]
+      local info = server_info_map[host]
 
       set_warp_active(warp_id, true)
-      Net.set_object_custom_property(area_id, warp_id, "Address", address)
+      Net.set_object_custom_property(area_id, warp_id, "Address", info.public_address)
       Net.set_object_custom_property(area_id, warp_id, "Data", info.data or "")
     else
       -- offline
@@ -262,12 +253,12 @@ local RANDOM_WARP_OBJECT <const> = Net.get_object_by_name(area_id, RANDOM_SERVER
 Net:on("custom_warp", function(event)
   if event.object_id ~= RANDOM_WARP_OBJECT.id then return end
 
-  local address = active_servers[math.random(#active_servers)]
+  local host = active_servers[math.random(#active_servers)]
 
-  if address then
+  if host then
     -- transfer
-    local info = server_info_map[address]
-    Net.transfer_server(event.player_id, address, true, info.data or "")
+    local info = server_info_map[host]
+    Net.transfer_server(event.player_id, info.public_address, true, info.data or "")
   else
     -- warp back in
     local direction = RANDOM_WARP_OBJECT.custom_properties.Direction
