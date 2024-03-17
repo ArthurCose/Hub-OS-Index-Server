@@ -9,12 +9,6 @@ local WARP_DATA = ""    -- What data should the warp from the index contain
 
 local INDEX_ADDRESS = "hubos.konstinople.dev"
 local POLL_RATE = 5 * 60
-local MESSAGE_CONSTANT =
-    "name=" .. Net.encode_uri_component(NAME) ..
-    "&message=" .. Net.encode_uri_component(MESSAGE) ..
-    "&address=" .. Net.encode_uri_component(WARP_ADDRESS) ..
-    "&data=" .. Net.encode_uri_component(WARP_DATA) ..
-    "&online="
 
 local online_count = 0
 
@@ -26,8 +20,38 @@ Net:on("player_disconnect", function()
   online_count = online_count - 1
 end)
 
+local server_message_handlers = {
+  index_query = function(event)
+    local response = "index_response:name=" .. Net.encode_uri_component(NAME) ..
+        "&message=" .. Net.encode_uri_component(MESSAGE) ..
+        "&address=" .. Net.encode_uri_component(WARP_ADDRESS) ..
+        "&data=" .. Net.encode_uri_component(WARP_DATA)
+
+    Async.message_server(event.address, response)
+  end,
+  index_verify = function(event, data)
+    Async.message_server(event.address, "index_verify:" .. data)
+  end
+}
+
+Net:on("server_message", function(event)
+  local colon_index = string.find(event.data, ":", 1, true)
+
+  if not colon_index then
+    -- invalid messsage
+    return
+  end
+
+  local prefix = string.sub(event.data, 1, colon_index - 1)
+  local handler = server_message_handlers[prefix]
+
+  if handler then
+    handler(event, string.sub(event.data, colon_index))
+  end
+end)
+
 local function loop()
-  Async.message_server(INDEX_ADDRESS, MESSAGE_CONSTANT .. online_count)
+  Async.message_server(INDEX_ADDRESS, "index_analytics:online=" .. online_count)
 
   Async.sleep(POLL_RATE).and_then(loop)
 end
