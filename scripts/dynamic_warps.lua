@@ -22,7 +22,8 @@ local Ampstr = require("scripts/index/ampstr")
 ---@field server_info ServerInfo
 
 local area_id <const> = "default"
-local default_message <const> = "No server is currently linked here."
+local unlinked_warp_message <const> = "No server is currently linked here."
+local default_warp_message <const> = "I'm not sure where this path leads!"
 local random_warp_message <const> = "Try your luck! This path links to a random server!"
 
 ---@type table<string, string>
@@ -320,15 +321,19 @@ Net:on("actor_interaction", function(event)
   if Ampstr.serious(event.player_id) then return end
 
   -- message
-  local message = default_message
+  local message
 
   local info_key = warp_map[warp_name]
   local server_info = info_key and server_info_map[info_key]
 
-  if server_info and warp_name == RANDOM_SERVER_WARP_NAME then
+  if warp_name == RANDOM_SERVER_WARP_NAME and #active_servers ~= 0 then
     message = random_warp_message
-  elseif server_info and server_info.message then
+  elseif not server_info then
+    message = unlinked_warp_message
+  elseif server_info.message then
     message = server_info.message
+  else
+    message = default_warp_message
   end
 
   Ampstr.message_player(event.player_id, message)
@@ -361,7 +366,7 @@ Net:on("custom_warp", function(event)
 
     -- let the player know what occurred
     local mugshot = Net.get_player_mugshot(event.player_id)
-    local message = "We can find other servers from here."
+    local message = "The warp closed\x01..."
     Net.message_player(event.player_id, message, mugshot.texture_path, mugshot.animation_path)
   end
 end)
