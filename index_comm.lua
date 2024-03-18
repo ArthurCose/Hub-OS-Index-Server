@@ -39,7 +39,7 @@ local server_message_handlers = {
   end,
   index_verify = function(event, data)
     Async.message_server(event.address, "index_verify:" .. data)
-    send_analytics(INDEX_ADDRESS)
+    send_analytics(event.address)
   end
 }
 
