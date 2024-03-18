@@ -68,8 +68,11 @@ local server_message_handlers = {
     local host = host_map[event.address]
 
     if not host then
-      -- request server info
-      Async.message_server(event.address, "index_query:info")
+      if not pending_verification[event.address] then
+        -- request server info if we haven't already
+        Async.message_server(event.address, "index_request:register")
+      end
+
       return
     end
 
@@ -80,12 +83,8 @@ local server_message_handlers = {
       server_info_map[host].last_online = os.time()
     end
   end,
-  index_response = function(event, data)
+  index_register = function(event, data)
     local data = URI.parse_query(data)
-
-    if not data.address then
-      return
-    end
 
     local warp_address = Net.decode_uri_component(data.address)
     local host = URI.get_host(warp_address)
@@ -96,19 +95,33 @@ local server_message_handlers = {
       host = host .. ":" .. port
     end
 
+    local server_info = {
+      public_address = host .. URI.get_data(warp_address),
+      name = Net.decode_uri_component(data.name),
+      message = Net.decode_uri_component(data.message),
+      data = Net.decode_uri_component(data.data),
+      link_date = os.time(),
+      last_online = 0
+    }
+
+    if host_map[event.address] == host then
+      -- server info must already exist if we've mapped the address
+      -- we'll just update it
+      local existing_info = server_info_map[host]
+      existing_info.public_address = server_info.public_address
+      existing_info.name = server_info.name
+      existing_info.data = server_info.data
+      existing_info.message = server_info.message
+      return
+    end
+
+    -- require verification to update server info
     local code = Net.system_random()
 
     pending_verification[event.address] = {
       host = host,
       code = code,
-      server_info = {
-        public_address = host .. URI.get_data(warp_address),
-        name = Net.decode_uri_component(data.name),
-        message = Net.decode_uri_component(data.message),
-        data = Net.decode_uri_component(data.data),
-        link_date = os.time(),
-        last_online = 0
-      }
+      server_info = server_info,
     }
 
     -- message the server using the warp address to verify the public address
