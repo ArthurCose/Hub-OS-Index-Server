@@ -81,7 +81,7 @@ local guide_list = {
   {
     slide_time = 0.7,
     target = Net.get_object_by_name(area_id, ACTIVE_SERVER_WARP_NAMES[2]),
-    message = "The green links lead other active servers."
+    message = "The green links lead to other active servers."
   },
   {
     slide_time = 1.8,
