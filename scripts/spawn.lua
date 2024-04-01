@@ -24,7 +24,7 @@ for y = 1, h - 1, 1 do
   end
 end
 
-Net:on("player_connect", function(event)
+Net:on("player_request", function(event)
   local position = spawn_locations[math.random(#spawn_locations)]
   Net.transfer_player(event.player_id, "default", true, position.x, position.y, 0)
 end)
