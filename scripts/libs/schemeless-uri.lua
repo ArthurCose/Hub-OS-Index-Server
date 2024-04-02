@@ -93,7 +93,7 @@ exports.iterate_query = function(text)
     local amp_index = string.find(text, "&", eq_index)
 
     if amp_index == nil then
-      amp_index = #text
+      amp_index = #text + 1
     end
 
     local key = string.sub(text, last_index, eq_index - 1)
