@@ -48,7 +48,11 @@ local online_count_map = {}
 --- list of hosts
 local active_servers = {}
 
+local save_loaded = false
+
 Async.read_file(SAVE_PATH).and_then(function(data)
+  save_loaded = true
+
   if data and #data > 0 then
     server_info_map = JSON.decode(data)
   end
@@ -269,7 +273,9 @@ local function update_warps()
 end
 
 local function save_data()
-  Async.write_file(SAVE_PATH, JSON.encode(server_info_map))
+  if save_loaded then
+    Async.write_file(SAVE_PATH, JSON.encode(server_info_map))
+  end
 end
 
 local function update_loop()
