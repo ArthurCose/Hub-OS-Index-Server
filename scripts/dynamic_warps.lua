@@ -20,6 +20,9 @@ local Ampstr = require("scripts/index/ampstr")
 ---@field host string
 ---@field code number
 ---@field server_info ServerInfo
+---@field creation_time number
+
+local VERIFICATION_EXPIRE_S = 5
 
 local area_id <const> = "default"
 local unlinked_warp_message <const> = "No server is currently linked here."
@@ -72,7 +75,9 @@ local server_message_handlers = {
     local host = host_map[event.address]
 
     if not host then
-      if not pending_verification[event.address] then
+      local pending = pending_verification[event.address]
+
+      if not pending or os.difftime(os.time(), pending.creation_time) > VERIFICATION_EXPIRE_S then
         -- request server info if we haven't already
         Async.message_server(event.address, "index_request:register")
       end
@@ -99,12 +104,14 @@ local server_message_handlers = {
       host = host .. ":" .. port
     end
 
+    local time = os.time()
+
     local server_info = {
       public_address = host .. URI.get_data(warp_address),
       name = Net.decode_uri_component(data.name),
       message = Net.decode_uri_component(data.message),
       data = Net.decode_uri_component(data.data),
-      link_date = os.time(),
+      link_date = time,
       last_online = 0
     }
 
@@ -120,16 +127,21 @@ local server_message_handlers = {
     end
 
     -- require verification to update server info
-    local code = Net.system_random()
+    local pending = pending_verification[event.address]
 
-    pending_verification[event.address] = {
-      host = host,
-      code = code,
-      server_info = server_info,
-    }
+    if not pending or os.difftime(time, pending.creation_time) > VERIFICATION_EXPIRE_S then
+      local code = Net.system_random()
 
-    -- message the server using the warp address to verify the public address
-    Async.message_server(host, "index_verify:" .. code)
+      pending_verification[event.address] = {
+        host = host,
+        code = code,
+        server_info = server_info,
+        creation_time = time,
+      }
+
+      -- message the server using the warp address to verify the public address
+      Async.message_server(host, "index_verify:" .. code)
+    end
   end,
   index_verify = function(event, data)
     local pending = pending_verification[event.address]
