@@ -92,6 +92,7 @@
   <object id="16" name="Discord Ampstr" type="Script Node: Spawn Bot" x="368" y="136">
    <properties>
     <property name="Animation" value="bots/ampstr.animation"/>
+    <property name="Name" value="Wumpstr"/>
     <property name="On Interact" type="object" value="19"/>
     <property name="On Load" type="bool" value="true"/>
     <property name="Solid" type="bool" value="true"/>
