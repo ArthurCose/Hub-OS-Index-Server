@@ -7,7 +7,7 @@ local WARP_DATA = ""    -- What data should the warp from the index contain
 
 --- Script (do not modify):
 
-local INDEX_ADDRESS = "hubos.konstinople.dev"
+local INDEX_ADDRESS = "servers.hubos.dev"
 local POLL_RATE = 5 * 60
 
 local online_count = 0
