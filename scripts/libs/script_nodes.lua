@@ -136,17 +136,21 @@ function ScriptNodes:new_empty()
     variables:clear_area(area_id)
   end)
 
-  instancer:on_instance_removed(function(instance_id)
-    variables:clear_instance(instance_id)
+  instancer:events():on("instance_removed", function(event)
+    variables:clear_instance(event.instance_id)
   end)
 
-  instancer:on_area_remove(function(area_id)
-    for _, bot_id in ipairs(Net.list_bots(area_id)) do
+  instancer:events():on("area_instanced", function(event)
+    s:load(event.area_id)
+  end)
+
+  instancer:events():on("area_removed", function(event)
+    for _, bot_id in ipairs(Net.list_bots(event.area_id)) do
       s:emit_bot_remove(bot_id)
       Net.remove_bot(bot_id)
     end
 
-    s:unload(area_id)
+    s:unload(event.area_id)
   end)
 
   return s
@@ -376,7 +380,7 @@ function ScriptNodes:emit_inventory_update(player_id, item_id)
 end
 
 ---Adds a listener for money changes.
----@param callback fun(player_id: Net.ActorId, item_id: string?)
+---@param callback fun(player_id: Net.ActorId)
 function ScriptNodes:on_money_update(callback)
   self._money_callbacks[#self._money_callbacks + 1] = callback
 end
@@ -449,18 +453,56 @@ end
 
 ---@param context table
 ---@param object Net.Object
+---@param err string
+local function prefix_node_context(context, object, err)
+  if context.area_id then
+    err = tostring(err) .. "\ncontext area id: " .. context.area_id
+  end
+
+  if object.id then
+    err = err .. "\nnode object id: " .. object.id
+  end
+
+  return err
+end
+
+---@param context table
+---@param object Net.Object
 function ScriptNodes:execute_node(context, object)
   local node_type = object.type:sub(#self.NODE_TYPE_PREFIX + 1)
   local callback = self._node_types[node_type:lower()]
 
   if not callback then
     if self:is_script_node(object) then
-      error('invalid script node: "' .. object.type .. '"')
+      error(prefix_node_context(context, object, 'invalid script node: "' .. object.type .. '"'))
     else
-      error('"' .. object.type .. '" is not implemented')
+      error(prefix_node_context(context, object, '"' .. object.type .. '" is not implemented'))
     end
   else
-    callback(context, object)
+    local function error_handler(err)
+      err = prefix_node_context(context, object, err)
+      printerr(debug.traceback(err, 2))
+    end
+
+    xpcall(callback, error_handler, context, object)
+  end
+end
+
+---@param node_type string
+---@param context table
+---@param object Net.Object
+function ScriptNodes:execute_node_as(node_type, context, object)
+  local callback = self._node_types[node_type:lower()]
+
+  if not callback then
+    error(prefix_node_context(context, object, '"' .. node_type .. '" is not implemented'))
+  else
+    local function error_handler(err)
+      err = prefix_node_context(context, object, err)
+      printerr(debug.traceback(err, 2))
+    end
+
+    xpcall(callback, error_handler, context, object)
   end
 end
 
@@ -1133,9 +1175,8 @@ function ScriptNodes:implement_area_api()
   self:implement_node("transfer to instance", function(context, object)
     local template_id = object.custom_properties.Area or context.area_id
     local instancer = self:instancer()
-    local instance_id = instancer:create_instance()
+    local instance_id = instancer:create_instance({ auto_remove = true })
     local new_area_id = instancer:clone_area_to_instance(instance_id, template_id) --[[@as string]]
-    self:load(new_area_id)
 
     local warp_in, x, y, z, direction = self:resolve_teleport_properties(object, new_area_id)
 

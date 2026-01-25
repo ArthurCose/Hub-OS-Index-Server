@@ -2,6 +2,9 @@
 -- https://luals.github.io/wiki/annotations/
 ---@diagnostic disable: missing-return, unused-local
 
+--- Similar to print, but for errors.
+function printerr(...) end
+
 ---@class Net.ActorId
 
 ---@class Net.SpriteId
@@ -11,7 +14,8 @@
 ---@class Net.EventEmitter
 Net.EventEmitter = {}
 
----@class Net.Promise<T>: { and_then: fun(callback: fun(T)) }
+---@class Net.Promise<T>: { and_then: fun(callback: fun(value: T)) }
+---@class Net.Promise: { and_then: fun(callback: fun()) }
 
 ---@class Net.Position
 ---@field x number
@@ -72,6 +76,7 @@ Net.EventEmitter = {}
 ---@field texture_path? string
 ---@field animation_path? string
 ---@field animation? string
+---@field loop_animation? string
 ---@field x? number
 ---@field y? number
 ---@field z? number
@@ -122,7 +127,7 @@ Net.EventEmitter = {}
 ---Net.message_player(player_id, message, textbox_options)
 ---```
 ---@class Net.TextStyle
----@field font_name? string
+---@field font? string
 ---@field monospace? boolean
 ---@field min_glyph_width? number
 ---@field letter_spacing? number
@@ -147,6 +152,26 @@ Net.EventEmitter = {}
 ---@field texture_path string
 ---@field animation_path? string
 ---@field animation? string Animation state, this state will be looped.
+---@field loop_animation? boolean
+
+---@class Net.TextSpriteOptions
+---@field player_id? Net.ActorId Restricts visibility to this specific player if set.
+---@field parent_id "widget" | "hud" | Net.ActorId
+---A point defined in the parent's animation file or built-in point such as "EMOTE".
+---If unset the origin will be used.
+---
+---For "widget" and "hud" the origin is the top left of the screen.
+---@field parent_point? string
+---@field x? number Offset from `parent_point` in screen pixels
+---@field y? number Offset from `parent_point` in screen pixels
+---@field layer? number Used for sorting sprites relative to the parent. Use negatives if you want to display in front of other sprites.
+---@field text string
+---@field text_style Net.TextStyle
+---@field h_align? "left" | "center" | "right"
+---@field v_align? "top" | "center" | "bottom"
+
+---@class Net.ReferOptions
+---@field unless_installed? boolean
 
 --- All fields are in the range: [0, 255]
 ---@class Net.Color
@@ -184,14 +209,10 @@ Net.EventEmitter = {}
 ---@field player_id Net.ActorId
 ---@field won boolean
 ---@field health number
----@field score number
 ---@field time number
 ---@field ran boolean
 ---@field emotion string
 ---@field turns number
----@field allies { name: string, health: number }[]
----@field enemies { name: string, health: number }[]
----@field neutral { name: string, health: number }[]
 
 ---@class Net.RequestOptions
 ---@field method? string
@@ -205,7 +226,8 @@ Async = {}
 ---@class Net: Net.EventEmitter
 Net = {}
 
---- Constructs a new EventEmitter instance.
+--- Returns [Net.EventEmitter](https://docs.hubos.dev/server/lua-api/event-emitters)
+---@return Net.EventEmitter
 function Net.EventEmitter.new() end
 
 --- Parameters after `event_name` are custom and passed to event listeners.
@@ -833,20 +855,20 @@ function Net.prompt_player(player_id, character_limit, default_text) end
 ---@param player_id Net.ActorId
 ---@param board_name string
 ---@param color Net.Color
----@param posts Net.BoardPost
+---@param posts Net.BoardPost[]
 ---@param open_instantly? boolean
 ---@return Net.EventEmitter
 function Net.open_board(player_id, board_name, color, posts, open_instantly) end
 
 --- Issues may arise when multiple scripts create boards at the same time.
 ---@param player_id Net.ActorId
----@param posts Net.BoardPost
+---@param posts Net.BoardPost[]
 ---@param post_id? string
 function Net.prepend_posts(player_id, posts, post_id) end
 
 --- Issues may arise when multiple scripts create boards at the same time.
 ---@param player_id Net.ActorId
----@param posts Net.BoardPost
+---@param posts Net.BoardPost[]
 ---@param post_id? string
 function Net.append_posts(player_id, posts, post_id) end
 
@@ -875,6 +897,18 @@ function Net.open_shop(player_id, shop_items, mug_texture_path, mug_animation_pa
 ---@param message string
 function Net.set_shop_message(player_id, message) end
 
+--- Issues may arise when multiple scripts create shops at the same time.
+---@param player_id Net.ActorId
+---@param shop_items Net.ShopItem[]
+---@param item_id? string
+function Net.prepend_shop_items(player_id, shop_items, item_id) end
+
+--- Issues may arise when multiple scripts create bshopsoards at the same time.
+---@param player_id Net.ActorId
+---@param shop_items Net.ShopItem[]
+---@param item_id? string
+function Net.append_shop_items(player_id, shop_items, item_id) end
+
 --- - `shop_item`: [Net.ShopItem](https://docs.hubos.dev/server/lua-api/widgets#netshopitem)
 ---
 --- Replaces the `shop_item` for the item matching the `id`.
@@ -894,6 +928,13 @@ function Net.remove_shop_item(player_id, item_id) end
 ---@return Net.SpriteId
 function Net.create_sprite(sprite_options) end
 
+--- - `text_sprite_options` [Net.TextSpriteOptions](https://docs.hubos.dev/server/lua-api/widgets#nettextspriteoptions)
+---
+--- Returns sprite_id
+---@param text_sprite_options Net.TextSpriteOptions
+---@return Net.SpriteId
+function Net.create_text_sprite(text_sprite_options) end
+
 --- Sets the animation state for the sprite.
 ---@param sprite_id Net.SpriteId
 ---@param state_name string
@@ -902,7 +943,7 @@ function Net.animate_sprite(sprite_id, state_name, loop) end
 
 --- Deletes the the sprite.
 ---@param sprite_id Net.SpriteId
-function Net.delete_sprite(sprite_id) end
+function Net.remove_sprite(sprite_id) end
 
 --- - `color`: [Net.Color](https://docs.hubos.dev/server/lua-api/widgets#netcolor)
 ---
@@ -934,7 +975,8 @@ function Net.refer_server(player_id, name, address) end
 --- Opens a menu on the client for the player to view and install a package from their preferred package repo.
 ---@param player_id Net.ActorId
 ---@param package_id string
-function Net.refer_package(player_id, package_id) end
+---@param refer_options? Net.ReferOptions
+function Net.refer_package(player_id, package_id, refer_options) end
 
 --- Gets permission from the player to permanently install a package on their client, allowing for the package to be used when disconnected and while on other servers.
 ---
@@ -1366,9 +1408,9 @@ function Net.give_player_card(player_id, package_id, code, amount) end
 --- Returns the amount of matching cards the player owns.
 ---@param player_id Net.ActorId
 ---@param package_id string
----@param color Net.Color
+---@param color_name string
 ---@return number
-function Net.get_player_block_count(player_id, package_id, color) end
+function Net.get_player_block_count(player_id, package_id, color_name) end
 
 --- Adds blocks to the player's pack.
 ---
@@ -1377,9 +1419,9 @@ function Net.get_player_block_count(player_id, package_id, color) end
 --- Accepts negative amount.
 ---@param player_id Net.ActorId
 ---@param package_id string
----@param color Net.Color
+---@param color_name string
 ---@param amount? number
-function Net.give_player_block(player_id, package_id, color, amount) end
+function Net.give_player_block(player_id, package_id, color_name, amount) end
 
 --- Returns true if the player can use the playable character's abilities.
 ---@param player_id Net.ActorId
@@ -1617,7 +1659,7 @@ function Net.provide_asset_for_player(player_id, path) end
 
 --- Similar to [Net.provide_asset_for_player](https://docs.hubos.dev/server/lua-api/assets#netprovide_asset_for_playerplayer_id-path), but also loads the package on the client.
 ---
---- This does not "install" packages on the client. Use [Net.offer_package()](https://docs.hubos.dev/server/lua-api/widgets#netoffer_packageplayer_id-package_path) or [Net.refer_package()](https://docs.hubos.dev/server/lua-api/widgets#netrefer_packageplayer_id-package_id) for that use case.
+--- This does not "install" packages on the client. Use [Net.offer_package()](https://docs.hubos.dev/server/lua-api/widgets#netoffer_packageplayer_id-package_path) or [Net.refer_package()](https://docs.hubos.dev/server/lua-api/widgets#netrefer_packageplayer_id-package_id-refer_options) for that use case.
 ---
 --- Calling in response to `player_request` will cause cached files on the client to be ignored.
 ---@param player_id Net.ActorId
@@ -1729,6 +1771,13 @@ function Async.await_all(promises) end
 ---@return Net.Promise<T>
 function Async.create_scope(callback) end
 
+--- Similar to [`Async.create_scope<T>()`](https://docs.hubos.dev/server/lua-api/async#asynccreate_scopetfunction-t)
+---
+--- Returns a promise.
+---@param callback fun()
+---@return Net.Promise<nil>
+function Async.create_scope(callback) end
+
 --- Returns a function that returns a promise, which resolves to the return value.
 ---
 --- ```lua
@@ -1742,8 +1791,15 @@ function Async.create_scope(callback) end
 --- say_after("world", 10).and_then(print) -- says "world" after 10s
 --- ```
 ---@generic T
----@param callback fun(...): T|nil
+---@param callback fun(...): T
 ---@return fun(...): Net.Promise<T>
+function Async.create_function(callback) end
+
+--- Similar to [`Async.create_function<T>()`](https://docs.hubos.dev/server/lua-api/async#asynccreate_functiontfunction-t)
+---
+--- Returns a promise.
+---@param callback fun()
+---@return Net.Promise<nil>
 function Async.create_function(callback) end
 
 --- - `request_options`: [Net.RequestOptions](https://docs.hubos.dev/server/lua-api/async#netrequestoptions)
