@@ -95,6 +95,10 @@ local server_message_handlers = {
   index_register = function(event, data)
     local data = URI.parse_query(data)
 
+    if tonumber(data.protocol) ~= Net.protocol_version() then
+      return
+    end
+
     local warp_address = Net.decode_uri_component(data.address)
     local host = URI.get_host(warp_address)
     local port = URI.get_port(event.address)
