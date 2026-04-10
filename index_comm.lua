@@ -1,9 +1,13 @@
 --- Custom Data:
 
-local NAME = ""         -- This server's name (currently unused, but may be used in the future)
-local MESSAGE = ""      -- Dialog for the ampstr
-local WARP_ADDRESS = "" -- What address should the warp link to (port is ignored)
-local WARP_DATA = ""    -- What data should the warp from the index contain
+-- This server's name (currently unused, but may be used in the future)
+local NAME = ""
+-- Dialog for the ampstr
+local MESSAGE = ""
+-- The address the warp links to, only include the port if it's not the default port
+local WARP_ADDRESS = ""
+-- Data included in the player_request event
+local WARP_DATA = ""
 
 --- Script (do not modify):
 

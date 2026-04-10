@@ -101,10 +101,10 @@ local server_message_handlers = {
 
     local warp_address = Net.decode_uri_component(data.address)
     local host = URI.get_host(warp_address)
-    local port = URI.get_port(event.address)
+    local port = URI.get_port(warp_address)
 
-    if port ~= 8765 then
-      -- append if the default port is not used
+    if port then
+      -- append if a port is set
       host = host .. ":" .. port
     end
 
