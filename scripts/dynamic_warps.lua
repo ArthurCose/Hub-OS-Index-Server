@@ -353,7 +353,7 @@ Net:on("actor_interaction", function(event)
   Net.set_bot_direction(event.actor_id, direction)
 
   -- serious
-  if Ampstr.serious(event.player_id) then return end
+  -- if Ampstr.serious(event.player_id) then return end
 
   -- message
   local message
