@@ -42,7 +42,7 @@ Net:on("tick", function()
 
   -- see if a player is in the way
   for _, player_id in ipairs(Net.list_players(area_id)) do
-    local player_position = Net.get_player_position(player_id)
+    local player_position = Net.get_actor_position(player_id)
 
     local player_diff_x = player_position.x - position.x
     local player_diff_y = player_position.y - position.y
@@ -63,7 +63,7 @@ Net:on("tick", function()
   position.x = position.x + movement.x * BOT_SPEED
   position.y = position.y + movement.y * BOT_SPEED
 
-  Net.move_bot(bot_id, position.x, position.y, 0)
+  Net.move_actor(bot_id, position.x, position.y, 0)
 
   if diff_x * diff_x + diff_y * diff_y < BOT_SPEED * BOT_SPEED * 2 then
     target_point = Net.get_object_by_id(area_id, target_point.custom_properties.Next)
@@ -103,12 +103,12 @@ local guide = Async.create_function(function(player_id)
   Async.await(Ampstr.message_player_async(player_id, "I'll show you around!"))
 
   local index = 1
-  local start_position = Net.get_player_position(player_id)
+  local start_position = Net.get_actor_position(player_id)
   local wait_time = 0.45
 
   while index <= #guide_list do
     local item = guide_list[index]
-    local target = item.target
+    local target = item.target --[[@as Net.Position]]
 
     local z = 0
 
@@ -141,8 +141,8 @@ Net:on("actor_interaction", function(event)
   end
 
   -- face the player
-  local player_position = Net.get_player_position(event.player_id)
-  Net.set_bot_direction(bot_id, Direction.diagonal_from_points(position, player_position))
+  local player_position = Net.get_actor_position(event.player_id)
+  Net.set_actor_direction(bot_id, Direction.diagonal_from_points(position, player_position))
 
   -- serious
   local conversation_end_callback = function()

@@ -26,5 +26,5 @@ end
 
 Net:on("player_request", function(event)
   local position = spawn_locations[math.random(#spawn_locations)]
-  Net.transfer_player(event.player_id, "default", true, position.x, position.y, 0)
+  Net.transfer_actor(event.player_id, "default", true, position.x, position.y, 0)
 end)

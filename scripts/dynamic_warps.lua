@@ -347,10 +347,10 @@ Net:on("actor_interaction", function(event)
   if not warp_name then return end
 
   -- face player
-  local a = Net.get_bot_position(event.actor_id)
-  local b = Net.get_player_position(event.player_id)
+  local a = Net.get_actor_position(event.actor_id)
+  local b = Net.get_actor_position(event.player_id)
   local direction = Direction.diagonal_from_points(a, b)
-  Net.set_bot_direction(event.actor_id, direction)
+  Net.set_actor_direction(event.actor_id, direction)
 
   -- serious
   -- if Ampstr.serious(event.player_id) then return end
@@ -397,7 +397,7 @@ Net:on("custom_warp", function(event)
 
     -- using Net.transfer_player to allow all players to see the warp
     -- need to still update warp handling through movement packets to improve this in the future
-    Net.transfer_player(event.player_id, area_id, true, x, y, z, direction)
+    Net.transfer_actor(event.player_id, area_id, true, x, y, z, direction)
 
     -- let the player know what occurred
     local mugshot = Net.get_player_mugshot(event.player_id)

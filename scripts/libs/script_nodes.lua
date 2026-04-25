@@ -70,8 +70,8 @@ end
 
 ---An interpreter using map objects as script nodes.
 ---
----A script node is an object with Type: `Script Node: [node type]`.
----An entry node is an object with Type: `Script Entry: [entry type]`
+---A script node is an object with Class: `Script Node: [node class]`.
+---An entry node is an object with Class: `Script Entry: [entry class]`
 ---
 ---Call :load() on every area_id that scripts should be enabled on.
 ---
@@ -79,7 +79,7 @@ end
 ---@class ScriptNodes
 ---@field private _instancer Instancer
 ---@field private _variables ScriptNodeVariables
----@field private _node_types table<string, fun(context: table, object: Net.Object)>
+---@field private _node_classes table<string, fun(context: table, object: Net.Object)>
 ---@field private _bot_script_ids table<string, table<string, Net.ActorId>>
 ---@field private _bot_script_ids_reversed table<Net.ActorId, [string, string]>
 ---@field private _tagged table<string, Net.ActorId[]>
@@ -97,8 +97,8 @@ end
 ---@field private _server_listeners [string, fun()][]
 ---@field private _destroy_callbacks fun()[]
 local ScriptNodes = {
-  NODE_TYPE_PREFIX = "Script Node: ",
-  ENTRY_TYPE_PREFIX = "Script Entry: ",
+  NODE_CLASS_PREFIX = "Script Node: ",
+  ENTRY_CLASS_PREFIX = "Script Entry: ",
   ASSET_PREFIX = "/server/assets/",
 }
 
@@ -111,7 +111,7 @@ function ScriptNodes:new_empty()
   local s = {
     _instancer = instancer,
     _variables = variables,
-    _node_types = {},
+    _node_classes = {},
     _bot_script_ids = {},
     _bot_script_ids_reversed = {},
     _tagged = {},
@@ -236,30 +236,30 @@ function ScriptNodes:on_load(callback)
 end
 
 ---Adds a listener to detect script nodes found during :load().
----@param node_type string
+---@param node_class string
 ---@param callback fun(area_id: string, object: Net.Object)
-function ScriptNodes:on_script_node_load(node_type, callback)
-  local type = node_type:lower()
-  local callbacks = self._script_load_callbacks[type]
+function ScriptNodes:on_script_node_load(node_class, callback)
+  local class = node_class:lower()
+  local callbacks = self._script_load_callbacks[class]
 
   if callbacks then
     callback[#callback + 1] = callback
   else
-    self._script_load_callbacks[type] = { callback }
+    self._script_load_callbacks[class] = { callback }
   end
 end
 
 ---Adds a listener to detect entry nodes found during :load().
----@param node_type string
+---@param node_class string
 ---@param callback fun(area_id: string, object: Net.Object)
-function ScriptNodes:on_entry_node_load(node_type, callback)
-  local type = node_type:lower()
-  local callbacks = self._entry_load_callbacks[type]
+function ScriptNodes:on_entry_node_load(node_class, callback)
+  local class = node_class:lower()
+  local callbacks = self._entry_load_callbacks[class]
 
   if callbacks then
     callback[#callback + 1] = callback
   else
-    self._entry_load_callbacks[type] = { callback }
+    self._entry_load_callbacks[class] = { callback }
   end
 end
 
@@ -276,8 +276,8 @@ end
 
 ---@param callback_map table<string, fun(area_id: string, object: Net.Object)[]>
 local function call_node_load_callbacks(area_id, object, prefix, callback_map)
-  local entry_type = object.type:sub(#prefix + 1):lower()
-  local callbacks = callback_map[entry_type]
+  local entry_class = object.class:sub(#prefix + 1):lower()
+  local callbacks = callback_map[entry_class]
 
   if callbacks then
     for _, callback in ipairs(callbacks) do
@@ -305,9 +305,9 @@ function ScriptNodes:load(area_id)
 
       for _, object in pairs(cached_objects) do
         if self:is_script_node(object) then
-          call_node_load_callbacks(area_id, object, self.NODE_TYPE_PREFIX, self._script_load_callbacks)
+          call_node_load_callbacks(area_id, object, self.NODE_CLASS_PREFIX, self._script_load_callbacks)
         elseif self:is_entry_node(object) then
-          call_node_load_callbacks(area_id, object, self.ENTRY_TYPE_PREFIX, self._entry_load_callbacks)
+          call_node_load_callbacks(area_id, object, self.ENTRY_CLASS_PREFIX, self._entry_load_callbacks)
         end
       end
 
@@ -332,7 +332,7 @@ function ScriptNodes:load(area_id)
     if self:is_script_node(object) then
       self:cache_object(area_id, object)
       Net.set_object_privacy(area_id, object.id, true)
-      call_node_load_callbacks(area_id, object, self.NODE_TYPE_PREFIX, self._script_load_callbacks)
+      call_node_load_callbacks(area_id, object, self.NODE_CLASS_PREFIX, self._script_load_callbacks)
     elseif self:is_entry_node(object) then
       self:cache_object(area_id, object)
       Net.set_object_privacy(area_id, object.id, true)
@@ -345,7 +345,7 @@ function ScriptNodes:load(area_id)
 
   for _, object in pairs(cached_objects) do
     if self:is_entry_node(object) then
-      call_node_load_callbacks(area_id, object, self.ENTRY_TYPE_PREFIX, self._entry_load_callbacks)
+      call_node_load_callbacks(area_id, object, self.ENTRY_CLASS_PREFIX, self._entry_load_callbacks)
     end
   end
 end
@@ -422,20 +422,20 @@ function ScriptNodes:emit_bot_remove(bot_id)
 end
 
 ---Used to create new script nodes
----@param node_type string
+---@param node_class string
 ---@param callback fun(context: table, object: Net.Object)
-function ScriptNodes:implement_node(node_type, callback)
-  self._node_types[node_type:lower()] = callback
+function ScriptNodes:implement_node(node_class, callback)
+  self._node_classes[node_class:lower()] = callback
 end
 
 ---@param object Net.Object
 function ScriptNodes:is_script_node(object)
-  return starts_with(object.type, self.NODE_TYPE_PREFIX)
+  return starts_with(object.class, self.NODE_CLASS_PREFIX)
 end
 
 ---@param object Net.Object
 function ScriptNodes:is_entry_node(object)
-  return starts_with(object.type, self.ENTRY_TYPE_PREFIX)
+  return starts_with(object.class, self.ENTRY_CLASS_PREFIX)
 end
 
 ---@param context table
@@ -469,14 +469,14 @@ end
 ---@param context table
 ---@param object Net.Object
 function ScriptNodes:execute_node(context, object)
-  local node_type = object.type:sub(#self.NODE_TYPE_PREFIX + 1)
-  local callback = self._node_types[node_type:lower()]
+  local node_class = object.class:sub(#self.NODE_CLASS_PREFIX + 1)
+  local callback = self._node_classes[node_class:lower()]
 
   if not callback then
     if self:is_script_node(object) then
-      error(prefix_node_context(context, object, 'invalid script node: "' .. object.type .. '"'))
+      error(prefix_node_context(context, object, 'invalid script node: "' .. object.class .. '"'))
     else
-      error(prefix_node_context(context, object, '"' .. object.type .. '" is not implemented'))
+      error(prefix_node_context(context, object, '"' .. object.class .. '" is not implemented'))
     end
   else
     local function error_handler(err)
@@ -488,14 +488,14 @@ function ScriptNodes:execute_node(context, object)
   end
 end
 
----@param node_type string
+---@param node_class string
 ---@param context table
 ---@param object Net.Object
-function ScriptNodes:execute_node_as(node_type, context, object)
-  local callback = self._node_types[node_type:lower()]
+function ScriptNodes:execute_node_as(node_class, context, object)
+  local callback = self._node_classes[node_class:lower()]
 
   if not callback then
-    error(prefix_node_context(context, object, '"' .. node_type .. '" is not implemented'))
+    error(prefix_node_context(context, object, '"' .. node_class .. '" is not implemented'))
   else
     local function error_handler(err)
       err = prefix_node_context(context, object, err)
@@ -758,12 +758,12 @@ function ScriptNodes:resolve_teleport_properties(object, target_area_id)
   return warp_in, x, y, z, direction
 end
 
----Implements support for the `Load`, `Server Event`, and `Player Interaction` entry types
+---Implements support for the `Load`, `Server Event`, and `Player Interaction` entry classes
 ---and the `On Load` property on all script nodes.
 ---
 ---When :load() is called on an area, any script nodes with `On Load` set to true will execute using a context containing `area_id`.
 ---
----As a reminder: entry nodes have a type starting with `Script Entry: ` such as `Script Entry: Load`
+---As a reminder: entry nodes have a class starting with `Script Entry: ` such as `Script Entry: Load`
 ---
 ---Custom properties supported by `Load`:
 --- - `Next [1]` a link to the next node (optional)
@@ -936,7 +936,7 @@ function ScriptNodes:implement_event_entry_api()
     end
 
     if event.player_id then
-      local area_id = Net.get_player_area(event.player_id)
+      local area_id = Net.get_actor_area(event.player_id)
 
       local object_ids = area_map[area_id]
 
@@ -966,7 +966,7 @@ function ScriptNodes:implement_event_entry_api()
       return
     end
 
-    local area_id = Net.get_player_area(event.player_id)
+    local area_id = Net.get_actor_area(event.player_id)
     local object_ids = player_interaction_event_map[area_id]
 
     if not object_ids then
@@ -984,7 +984,7 @@ function ScriptNodes:implement_event_entry_api()
       return
     end
 
-    local area_id = Net.get_player_area(event.player_id)
+    local area_id = Net.get_actor_area(event.player_id)
     local object_ids = tile_interaction_event_map[area_id]
 
     if not object_ids then
@@ -1005,7 +1005,7 @@ function ScriptNodes:implement_event_entry_api()
       return
     end
 
-    local area_id = Net.get_player_area(event.player_id)
+    local area_id = Net.get_actor_area(event.player_id)
     local object_ids = help_event_map[area_id]
 
     if not object_ids then
@@ -1038,7 +1038,7 @@ function ScriptNodes:implement_event_entry_api()
   end)
 
   self:on_server_event("item_use", function(event)
-    local area_id = Net.get_player_area(event.player_id)
+    local area_id = Net.get_actor_area(event.player_id)
     local item_map = item_event_map[area_id]
     local next_id = item_map and item_map[event.item_id]
 
@@ -1161,10 +1161,10 @@ function ScriptNodes:implement_area_api()
 
     if context.player_ids then
       for _, player_id in ipairs(context.player_ids) do
-        Net.transfer_player(player_id, area_id, warp_in, x, y, z, direction)
+        Net.transfer_actor(player_id, area_id, warp_in, x, y, z, direction)
       end
     else
-      Net.transfer_player(context.player_id, area_id, warp_in, x, y, z, direction)
+      Net.transfer_actor(context.player_id, area_id, warp_in, x, y, z, direction)
     end
 
     self:execute_next_node(context, context.area_id, object)
@@ -1189,7 +1189,7 @@ function ScriptNodes:implement_area_api()
     end
 
     for_each_player(context, function(player_id)
-      Net.transfer_player(player_id, new_area_id, warp_in, x, y, z, direction)
+      Net.transfer_actor(player_id, new_area_id, warp_in, x, y, z, direction)
     end)
 
     self:execute_next_node(context, context.area_id, object)
@@ -1222,7 +1222,7 @@ function ScriptNodes:implement_area_api()
     end
 
     for_each_player(context, function(player_id)
-      Net.transfer_player(player_id, new_area_id, warp_in, x, y, z, direction)
+      Net.transfer_actor(player_id, new_area_id, warp_in, x, y, z, direction)
     end)
 
     self:execute_next_node(context, context.area_id, object)
@@ -1267,7 +1267,7 @@ function ScriptNodes:implement_object_api()
       return
     end
 
-    local area_id = Net.get_player_area(event.player_id)
+    local area_id = Net.get_actor_area(event.player_id)
 
     if not self:is_loaded(area_id) then
       return
@@ -1287,7 +1287,7 @@ function ScriptNodes:implement_object_api()
   end)
 
   self:on_server_event("custom_warp", function(event)
-    local area_id = Net.get_player_area(event.player_id)
+    local area_id = Net.get_actor_area(event.player_id)
 
     if not self:is_loaded(area_id) then
       return
@@ -1918,11 +1918,8 @@ function ScriptNodes:implement_camera_api()
         properties.x = target_object.x
         properties.y = target_object.y
         properties.z = target_object.z
-      elseif Net.is_player(actor_id) then
-        properties.x, properties.y, properties.z = Net.get_player_position_multi(actor_id)
-        properties.actor_id = actor_id
-      elseif Net.is_bot(actor_id) then
-        properties.x, properties.y, properties.z = Net.get_bot_position_multi(actor_id)
+      elseif Net.is_actor(actor_id) then
+        properties.x, properties.y, properties.z = Net.get_actor_position_multi(actor_id)
         properties.actor_id = actor_id
       end
     else
@@ -1963,7 +1960,7 @@ function ScriptNodes:implement_camera_api()
       elseif context.player_ids then
         for _, player_id in ipairs(context.player_ids) do
           if object.custom_properties.Target == "Player" then
-            properties.x, properties.y, properties.z = Net.get_player_position_multi(player_id)
+            properties.x, properties.y, properties.z = Net.get_actor_position_multi(player_id)
             properties.actor_id = player_id
           end
 
@@ -2348,7 +2345,7 @@ function ScriptNodes:implement_actor_api()
       return
     end
 
-    local area_id = Net.get_player_area(event.player_id)
+    local area_id = Net.get_actor_area(event.player_id)
     local context = {
       area_id = area_id,
       player_id = event.player_id,
@@ -2432,12 +2429,10 @@ function ScriptNodes:implement_actor_api()
 
     if (not actor_string or actor_string == "Player") and context.player_ids then
       for _, player_id in ipairs(context.player_ids) do
-        Net.set_player_emote(player_id, emote_id)
+        Net.set_actor_emote(player_id, emote_id)
       end
-    elseif actor_id and Net.is_player(actor_id) then
-      Net.set_player_emote(actor_id, emote_id)
-    elseif actor_id and Net.is_bot(actor_id) then
-      Net.set_bot_emote(actor_id, emote_id)
+    elseif actor_id then
+      Net.set_actor_emote(actor_id, emote_id)
     end
 
     self:execute_next_node(context, context.area_id, object)
@@ -2464,10 +2459,8 @@ function ScriptNodes:implement_actor_api()
 
       if not target_actor_id then
         target_position = self:resolve_object(context.area_id, object.custom_properties.Target)
-      elseif Net.is_player(target_actor_id) then
-        target_position = Net.get_player_position(target_actor_id)
-      elseif Net.is_bot(target_actor_id) then
-        target_position = Net.get_bot_position(target_actor_id)
+      elseif Net.is_actor(target_actor_id) then
+        target_position = Net.get_actor_position(target_actor_id)
       end
     end
 
@@ -2480,28 +2473,21 @@ function ScriptNodes:implement_actor_api()
           end
 
           if target_position then
-            direction = resolve_direction(Net.get_player_position(player_id), target_position)
+            direction = resolve_direction(Net.get_actor_position(player_id), target_position)
           end
 
           local keyframes = { { properties = { { property = "Direction", value = direction } } } }
 
-          Net.animate_player_properties(player_id, keyframes)
+          Net.animate_actor_properties(player_id, keyframes)
 
           ::continue::
         end
-      elseif actor_id and Net.is_player(actor_id) then
+      elseif actor_id and Net.is_actor(actor_id) then
         if target_position then
-          direction = resolve_direction(Net.get_player_position(actor_id), target_position)
+          direction = resolve_direction(Net.get_actor_position(actor_id), target_position)
         end
 
-        local keyframes = { { properties = { { property = "Direction", value = direction } } } }
-        Net.animate_player_properties(actor_id, keyframes)
-      elseif actor_id and Net.is_bot(actor_id) then
-        if target_position then
-          direction = resolve_direction(Net.get_bot_position(actor_id), target_position)
-        end
-
-        Net.set_bot_direction(actor_id, direction)
+        Net.set_actor_direction(actor_id, direction)
       end
     end
 
@@ -2521,12 +2507,10 @@ function ScriptNodes:implement_actor_api()
 
     if ((not context.bot_id and not actor_string) or actor_string == "Player") and context.player_ids then
       for _, player_id in ipairs(context.player_ids) do
-        Net.animate_player(player_id, state, loop)
+        Net.animate_actor(player_id, state, loop)
       end
-    elseif actor_id and Net.is_player(actor_id) then
-      Net.animate_player(actor_id, state, loop)
-    elseif actor_id and Net.is_bot(actor_id) then
-      Net.animate_bot(actor_id, state, loop)
+    elseif actor_id and Net.is_actor(actor_id) then
+      Net.animate_actor(actor_id, state, loop)
     end
 
     self:execute_next_node(context, context.area_id, object)
@@ -2552,15 +2536,17 @@ function ScriptNodes:implement_actor_api()
 
     if ((not context.bot_id and not actor_string) or actor_string == "Player") and context.player_ids then
       for _, player_id in ipairs(context.player_ids) do
-        Net.teleport_player(player_id, warp_in, x, y, z, direction)
+        if warp_in then
+          Net.warp_actor(player_id, x, y, z, direction)
+        else
+          Net.move_actor(player_id, x, y, z, direction)
+        end
       end
-    elseif actor_id and Net.is_player(actor_id) then
-      Net.teleport_player(actor_id, warp_in, x, y, z, direction)
-    elseif actor_id and Net.is_bot(actor_id) then
-      Net.move_bot(actor_id, x, y, z)
-
-      if direction then
-        Net.set_bot_direction(actor_id, direction)
+    elseif actor_id and Net.is_actor(actor_id) then
+      if warp_in then
+        Net.warp_actor(actor_id, x, y, z, direction)
+      else
+        Net.move_actor(actor_id, x, y, z, direction)
       end
     end
 
@@ -2704,16 +2690,16 @@ function ScriptNodes:implement_common_animations_api()
     -- animate player and fade out
     for_each_player_safe(context, function(player_id)
       if walk_distance then
-        local x, y = Net.get_player_position_multi(player_id)
+        local x, y = Net.get_actor_position_multi(player_id)
         local offset_x, offset_y = Direction.unit_vector_multi(
-          direction or Net.get_player_direction(player_id)
+          direction or Net.get_actor_direction(player_id)
         )
 
         keyframe_properties[1].value = x + offset_x * walk_distance
         keyframe_properties[2].value = y + offset_y * walk_distance
       end
 
-      Net.animate_player_properties(player_id, keyframes)
+      Net.animate_actor_properties(player_id, keyframes)
       Net.lock_player_input(player_id)
       Net.fade_player_camera(player_id, fade_color, HALF_DURATION)
     end)
@@ -2923,12 +2909,12 @@ function ScriptNodes:implement_path_api()
     local dist = screen_distance(
       context.area_id,
       first_node.x, first_node.y, first_node.z,
-      Net.get_player_position_multi(player_id)
+      Net.get_actor_position_multi(player_id)
     )
     local duration = dist / (speed * 20)
 
     keyframes[1].duration = duration
-    Net.animate_player_properties(player_id, keyframes)
+    Net.animate_actor_properties(player_id, keyframes)
 
     return duration
   end
@@ -3065,7 +3051,7 @@ end
 
 ---Implements support for the `Collision` entry node, and the `Set Collider` script node.
 ---
----As a reminder: entry nodes have a type starting with `Script Entry: ` such as `Script Entry: Collision`
+---As a reminder: entry nodes have a class starting with `Script Entry: ` such as `Script Entry: Collision`
 ---
 ---Custom properties supported by `Collision`:
 --- - `On Enter` a link to a script node (optional)
@@ -3136,7 +3122,7 @@ function ScriptNodes:implement_collision_api()
         return
       end
 
-      local x, y, z = Net.get_player_position_multi(player_id)
+      local x, y, z = Net.get_actor_position_multi(player_id)
       object_options.x = x - radius
       object_options.y = y - radius
       object_options.z = z
@@ -3165,7 +3151,7 @@ function ScriptNodes:implement_collision_api()
       object_colliders:remove_all_on_actor(actor_id)
 
       if radius then
-        local x, y, z = Net.get_bot_position_multi(actor_id)
+        local x, y, z = Net.get_actor_position_multi(actor_id)
         object_options.x = x - radius
         object_options.y = y - radius
         object_options.z = z
@@ -3521,10 +3507,8 @@ function ScriptNodes:implement_party_api()
     local radius_sqr = radius * radius
     local center_x, center_y, center_z
 
-    if target_id and Net.is_player(target_id) then
-      center_x, center_y, center_z = Net.get_player_position_multi(target_id)
-    elseif target_id and Net.is_bot(target_id) then
-      center_x, center_y, center_z = Net.get_player_position_multi(target_id)
+    if target_id and Net.is_actor(target_id) then
+      center_x, center_y, center_z = Net.get_actor_position_multi(target_id)
     else
       local target_object = self:resolve_object(context.area_id, target_id --[[@as number]])
 
@@ -3543,7 +3527,7 @@ function ScriptNodes:implement_party_api()
           goto continue
         end
 
-        local x, y, z = Net.get_player_position_multi(player_id)
+        local x, y, z = Net.get_actor_position_multi(player_id)
         local x_diff = x - center_x
         local y_diff = y - center_y
         local z_diff = z - center_z
@@ -3572,7 +3556,7 @@ function ScriptNodes:implement_party_api()
         goto continue
       end
 
-      local x, y, z = Net.get_player_position_multi(player_id)
+      local x, y, z = Net.get_actor_position_multi(player_id)
 
       if object.z ~= z then
         goto continue
