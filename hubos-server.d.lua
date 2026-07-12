@@ -220,6 +220,9 @@ Net.EventEmitter = {}
 ---@field headers? table<string, string>
 ---@field body? string
 
+---@class Net.CommandInfo
+---@field description string
+
 --- If you want to use IO while players are connected, you'll want to use the Async API to prevent server hiccups.
 --- Note: paths in this section use system paths and not asset paths.
 Async = {}
@@ -861,12 +864,12 @@ function Net.prompt_player(player_id, textbox_options) end
 ---
 --- Returns [Net.EventEmitter](https://docs.hubos.dev/server/lua-api/event-emitters), re-emits `post_selection`, `post_request`, and `board_close` server events.
 ---@param player_id Net.ActorId
----@param board_name string
+---@param topic string
 ---@param color Net.Color
 ---@param posts Net.BoardPost[]
 ---@param open_instantly? boolean
 ---@return Net.EventEmitter
-function Net.open_board(player_id, board_name, color, posts, open_instantly) end
+function Net.open_board(player_id, topic, color, posts, open_instantly) end
 
 --- Issues may arise when multiple scripts create boards at the same time.
 ---@param player_id Net.ActorId
@@ -884,6 +887,19 @@ function Net.append_posts(player_id, posts, post_id) end
 ---@param player_id Net.ActorId
 ---@param post_id string
 function Net.remove_post(player_id, post_id) end
+
+--- Remove all posts on the currently opened board for the player.
+---
+--- Issues may arise when multiple scripts create boards at the same time.
+---@param player_id Net.ActorId
+function Net.clear_board(player_id) end
+
+--- Updates the top label on currently opened board for the player.
+---
+--- Issues may arise when multiple scripts create boards at the same time.
+---@param player_id Net.ActorId
+---@param topic string
+function Net.update_board_topic(player_id, topic) end
 
 --- Closes the currently opened board for the player.
 ---@param player_id Net.ActorId
@@ -956,9 +972,9 @@ function Net.remove_sprite(sprite_id) end
 --- - `color`: [Net.Color](https://docs.hubos.dev/server/lua-api/widgets#netcolor)
 ---
 --- Sets the color of the marker used in the map menu to represent this player. Defaults to `{ r: 0, g: 0, b: 0, a: 0 }`
----@param player_id Net.ActorId
+---@param actor_id Net.ActorId
 ---@param color Net.Color
-function Net.set_actor_map_color(player_id, color) end
+function Net.set_actor_map_color(actor_id, color) end
 
 --- Sends a link to the player to open in the browser. Permission will be asked before opening.
 ---
@@ -1491,6 +1507,11 @@ function Net.warp_actor(actor_id, x, y, z, direction) end
 ---@param direction? string
 function Net.transfer_actor(player_id, area_id, warp_in, x, y, z, direction) end
 
+--- Returns [Net.TextureAnimationPair](https://docs.hubos.dev/server/lua-api/widgets#nettextureanimationpair)
+---@param actor_id Net.ActorId
+---@return Net.TextureAnimationPair
+function Net.get_actor_avatar(actor_id) end
+
 --- Sets texture and animation files used to display the actor.
 ---@param actor_id Net.ActorId
 ---@param texture_path string
@@ -1528,7 +1549,7 @@ function Net.set_actor_emote(actor_id, emote_id) end
 ---@param loop? boolean
 function Net.animate_actor(actor_id, state_name, loop) end
 
---- - `keyframes`: [Net.ActorKeyframe[]](https://docs.hubos.dev/server/lua-api/actor-api#netactorkeyframe)
+--- - `keyframes`: [Net.ActorKeyframe[]](https://docs.hubos.dev/server/lua-api/actors#netactorkeyframe)
 ---
 --- Interpolated animations for fancy effects.
 ---
@@ -1926,6 +1947,38 @@ function Async.initiate_pvp(player_1_id, player_2_id, package_path, encounter_da
 ---@param encounter_data? any
 ---@return Net.Promise<Net.BattleResults?>[]
 function Async.initiate_netplay(player_ids, package_path, encounter_data) end
+
+--- Stops the server.
+function Net.shutdown() end
+
+--- Logs a message to the specified user, or the console if nil.
+---@param player_id? Net.ActorId
+---@param any any
+function Net.print_to(player_id, any) end
+
+--- Logs a warning to the specified user, or the console if nil.
+---@param player_id? Net.ActorId
+---@param any any
+function Net.warn_to(player_id, any) end
+
+--- Logs a warning to the specified user, or the console if nil.
+---@param player_id? Net.ActorId
+---@param any any
+function Net.error_to(player_id, any) end
+
+--- Registers a command. The command can be processed through the `command` server event.
+---@param name string
+---@param command_info Net.CommandInfo
+function Net.register_command(name, command_info) end
+
+--- Returns a list of all registered command names.
+---@return string[]
+function Net.list_commands() end
+
+--- Returns a string or nil, for the description of the command created through [Net.register_command()](https://docs.hubos.dev/server/lua-api/administration#netregister_commandname-command_info)
+---@param name string
+---@return string
+function Net.get_command_description(name) end
 
 --- Encodes characters for use in a URI or within file names.
 ---
