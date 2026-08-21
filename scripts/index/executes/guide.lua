@@ -1,6 +1,3 @@
-require("scripts/index/constants")
-math.randomseed()
-
 local Direction = require("scripts/libs/direction")
 local Ampstr = require("scripts/index/ampstr")
 
