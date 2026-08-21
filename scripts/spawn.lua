@@ -1,8 +1,6 @@
 -- we're going to spawn players at a random position on the map
 -- and considering only the first two tiles as safe locations to spawn the player
 
-math.randomseed()
-
 local spawn_locations = {}
 
 local area_id = "default"
